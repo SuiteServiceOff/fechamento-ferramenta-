@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Fechamento</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+     <link rel = "icon" href="https://cdn-icons-png.flaticon.com/512/2246/2246638.png">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --primary: #38bdf8;
+            --accent: #10b981;
+            --text-gray: #94a3b8;
+            --text-light: #f1f5f9;
+        }
+
+        body { 
+            font-family: 'Inter', 'Segoe UI', sans-serif; 
+            background-color: var(--bg-dark); 
+            color: var(--text-light);
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            margin: 0;
+        }
+
+        .container { 
+            background: var(--card-bg); 
+            padding: 40px; 
+            border-radius: 20px; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); 
+            width: 100%; 
+            max-width: 750px; 
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        h2 { color: var(--primary); margin-bottom: 30px; letter-spacing: 1px; }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+
+        .file-label {
+            background-color: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            padding: 12px 25px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            flex: 1;
+        }
+
+        .file-label:hover { 
+            background-color: var(--primary); 
+            color: var(--bg-dark);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+        }
+
+        input[type="file"] { display: none; }
+
+        #resultado { 
+            background: #020617; 
+            color: #bae6fd; 
+            padding: 25px; 
+            border-radius: 12px; 
+            white-space: pre-wrap; 
+            font-size: 14px; 
+            line-height: 1.7; 
+            text-align: left;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            border: 1px solid #1e293b;
+            margin-bottom: 25px;
+            min-height: 150px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .btn-copy { 
+            background-color: var(--accent); 
+            color: white; 
+            border: none; 
+            padding: 15px; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            font-size: 16px; 
+            width: 100%;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-copy:hover { 
+            background-color: #059669; 
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+            transform: scale(1.02);
+        }
+        
+        .btn-copy.success { background-color: #6366f1; }
+
+        .header-deco {
+            width: 50px;
+            height: 4px;
+            background: var(--primary);
+            margin: 0 auto 20px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-deco"></div>
+    
+    
+    <div class="button-group">
+        <label for="file-input" class="file-label">
+            📂 PESQUISAR ARQUIVO
+        </label>
+        <input type="file" id="file-input" accept=".xlsx, .xls">
+    </div>
+    
+    <div id="resultado">Aguardando arquivo para processamento...</div>
+    
+    <button class="btn-copy" onclick="copyToClipboard()">📋 COPIAR TEXTO</button>
+</div>
+
+<script>
+    document.getElementById('file-input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const data = new Uint8Array(event.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            
+            const getVal = (cell) => sheet[cell] ? String(sheet[cell].v).trim() : "";
+
+            // Função auxiliar para validar se o campo é apenas o título da planilha ou vazio
+            const validarCampo = (valor, titulo) => {
+                if (!valor || valor === "" || valor.toUpperCase() === titulo.toUpperCase()) {
+                    return "não solicitado";
+                }
+                return valor;
+            };
+
+            // Lógica de Extração
+            const desc = getVal('A17') || "Não informado";
+            
+            // Extração com validação para evitar que o título da coluna seja retornado
+            const pecaDesc = validarCampo(getVal('A39') || getVal('A38'), "DESCRIÇÃO DA PEÇA");
+            const partNumber = validarCampo(getVal('C39') || getVal('C38'), "PART NUMBER");
+            const qtd = validarCampo(getVal('E39') || getVal('E38'), "QTD.");
+            const motivo = validarCampo(getVal('G39') || getVal('G38'), "MOTIVO DA SOLICITAÇÃO");
+            
+            const nomeTecnico = getVal('G55') || getVal('F55') || "Não localizado";
+            const rawCliente = getVal('B55') || getVal('A55');
+            const nomeCliente = rawCliente.replace("Nome do Cliente:", "").trim() || "Não localizado";
+
+            let validacao = "não solicitado"; 
+            
+            Object.keys(sheet).forEach(cell => {
+                if(sheet[cell] && sheet[cell].v) {
+                    const val = String(sheet[cell].v);
+                    if(val.includes('ARN')) {
+                        const match = val.match(/ARN\d+/);
+                        if(match) validacao = match[0];
+                    }
+                }
+            });
+
+            // Layout de saída
+            let output = `[LD]\n`;
+            output += `Nome completo do técnico: ${nomeTecnico}\n`;
+            output += `Nome do Cliente: ${nomeCliente}\n\n`;
+            output += `Descrição: ${desc}\n\n`;
+            output += `Código de Validação: ${validacao}\n`;
+            output += `DESCRIÇÃO DA PEÇA: ${pecaDesc}\n`;
+            output += `PART NUMBER: ${partNumber}\n`;
+            output += `QTD: ${qtd}\n`;
+            output += `MOTIVO DA SOLICITAÇÃO: ${motivo}`;
+
+            document.getElementById('resultado').innerText = output;
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    function copyToClipboard() {
+        const text = document.getElementById('resultado').innerText;
+        const btn = document.querySelector('.btn-copy');
+        
+        if(text.includes("Aguardando")) return;
+
+        navigator.clipboard.writeText(text).then(() => {
+            const originalText = btn.innerText;
+            btn.innerText = "✅ COPIADO!";
+            btn.classList.add('success');
+            
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.classList.remove('success');
+            }, 2000);
+        });
+    }
+</script>
+
+</body>
+</html>
